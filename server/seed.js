@@ -12,11 +12,20 @@ const write = (name, data) => {
   if (!fs.existsSync(file)) fs.writeFileSync(file, JSON.stringify(data, null, 2))
 }
 
-// Starter passwords — change them with: npm run set-password -- hannah <newPassword>
-write('users.json', [
-  { username: 'hannah', displayName: 'Hannah', ...hashPassword('hannah123') },
-  { username: 'prince', displayName: 'Prince', ...hashPassword('prince123') },
-])
+const usersFile = path.join(dir, 'users.json')
+if (!fs.existsSync(usersFile)) {
+  const passwords = {
+    hannah: process.env.HANNAH_INITIAL_PASSWORD,
+    prince: process.env.PRINCE_INITIAL_PASSWORD,
+  }
+  if (Object.values(passwords).some((password) => !password || password.length < 8)) {
+    throw new Error('Set HANNAH_INITIAL_PASSWORD and PRINCE_INITIAL_PASSWORD to values at least 8 characters long before first run.')
+  }
+  write('users.json', [
+    { username: 'hannah', displayName: 'Hannah', ...hashPassword(passwords.hannah) },
+    { username: 'prince', displayName: 'Prince', ...hashPassword(passwords.prince) },
+  ])
+}
 write('progress.json', { hannah: {}, prince: {} })
 write('password-resets.json', [])
 write('config.json', {
