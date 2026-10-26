@@ -7,8 +7,7 @@
     "dev": "concurrently -k \"node server/index.js\" \"vite\"",
     "build": "vite build",
     "test": "node --test",
-    "start": "node server/index.js",
-    "set-password": "node server/set-password.js"
+    "start": "node server/index.js"
   },
   "dependencies": {
     "@netlify/blobs": "^8.2.0",

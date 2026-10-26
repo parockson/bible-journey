@@ -37,69 +37,58 @@ async function request(handler, method, path, body, token) {
   return { statusCode: response.statusCode, body: JSON.parse(response.body) }
 }
 
-test('Netlify API initializes private accounts and supports partner-approved password recovery', async () => {
+test('Netlify API initializes fixed-password accounts and rejects password changes and recovery', async () => {
   const handler = createApiHandler(createMemoryStore(), {
     AUTH_SECRET: 'test-secret-that-is-at-least-thirty-two-characters-long',
-    HANNAH_INITIAL_PASSWORD: 'hannah-initial-pass',
-    PRINCE_INITIAL_PASSWORD: 'prince-initial-pass',
+    HANNAH_INITIAL_PASSWORD: 'hannah-fixed-test-password',
+    PRINCE_INITIAL_PASSWORD: 'prince-fixed-test-password',
     JOURNEY_START_DATE: '2026-01-01',
   })
 
   const firstLogin = await request(handler, 'POST', '/api/login', {
     username: 'hannah',
-    password: 'hannah-initial-pass',
+    password: 'hannah-fixed-test-password',
   })
   assert.equal(firstLogin.statusCode, 200)
-  assert.equal(firstLogin.body.mustChangePassword, true)
-
-  const changePassword = await request(handler, 'POST', '/api/password/change', {
-    password: 'hannah-new-password',
-  }, firstLogin.body.token)
-  assert.equal(changePassword.statusCode, 200)
-  assert.equal((await request(handler, 'POST', '/api/login', {
+  assert.equal('mustChangePassword' in firstLogin.body, false)
+  assert.equal('pendingResetApproval' in firstLogin.body, false)
+  assert.equal((await request(handler, 'POST', '/api/password/change', {
+    password: 'replacement-password',
+  }, firstLogin.body.token)).statusCode, 404)
+  assert.equal((await request(handler, 'POST', '/api/password-reset/request', {
     username: 'hannah',
-    password: 'hannah-new-password',
-  })).body.mustChangePassword, false)
-
-  const resetRequest = await request(handler, 'POST', '/api/password-reset/request', { username: 'hannah' })
-  assert.equal(resetRequest.statusCode, 200)
-  const princeLogin = await request(handler, 'POST', '/api/login', {
-    username: 'prince',
-    password: 'prince-initial-pass',
-  })
-  assert.equal(princeLogin.body.pendingResetApproval.id, resetRequest.body.requestId)
-
-  const approval = await request(handler, 'POST', '/api/password-reset/decision', {
-    id: resetRequest.body.requestId,
-    approve: true,
-  }, princeLogin.body.token)
-  assert.equal(approval.body.status, 'approved')
-  assert.equal((await request(handler, 'GET', `/api/password-reset/status/${resetRequest.body.requestId}`)).body.status, 'approved')
-
-  const resetComplete = await request(handler, 'POST', '/api/password-reset/complete', {
-    requestId: resetRequest.body.requestId,
-    password: 'hannah-reset-password',
-  })
-  assert.equal(resetComplete.statusCode, 200)
-  assert.equal((await request(handler, 'POST', '/api/login', {
-    username: 'hannah',
-    password: 'hannah-reset-password',
-  })).statusCode, 200)
-
-  const deniedRequest = await request(handler, 'POST', '/api/password-reset/request', { username: 'prince' })
-  const hannahLogin = await request(handler, 'POST', '/api/login', {
-    username: 'hannah',
-    password: 'hannah-reset-password',
-  })
-  const denied = await request(handler, 'POST', '/api/password-reset/decision', {
-    id: deniedRequest.body.requestId,
-    approve: false,
-  }, hannahLogin.body.token)
-  assert.equal(denied.body.status, 'denied')
+  })).statusCode, 404)
   assert.equal((await request(handler, 'POST', '/api/login', {
     username: 'prince',
-    password: 'prince-initial-pass',
+    password: 'prince-fixed-test-password',
   })).statusCode, 200)
+})
+
+test('Netlify API syncs configured passwords to existing accounts without resetting progress', async () => {
+  const oldCredentials = hashPassword('old-password', 'old-salt')
+  const store = createMemoryStore([
+    ['user:hannah', { username: 'hannah', displayName: 'Hannah', ...oldCredentials }],
+    ['progress:hannah', { 1: 'saved-progress' }],
+  ])
+  const env = {
+    AUTH_SECRET: 'test-secret-that-is-at-least-thirty-two-characters-long',
+    HANNAH_INITIAL_PASSWORD: 'hannah-fixed-test-password',
+    PRINCE_INITIAL_PASSWORD: 'prince-fixed-test-password',
+  }
+  const handler = createApiHandler(store, env)
+
+  const newLogin = await request(handler, 'POST', '/api/login', {
+    username: 'hannah',
+    password: 'hannah-fixed-test-password',
+  })
+  assert.equal(newLogin.statusCode, 200)
+  assert.equal((await request(handler, 'POST', '/api/login', {
+    username: 'hannah',
+    password: 'old-password',
+  })).statusCode, 401)
+
+  const state = await request(handler, 'GET', '/api/state', null, newLogin.body.token)
+  assert.deepEqual(state.body.progress.hannah, { 1: 'saved-progress' })
 })
 
 test('Netlify API performs a guarded one-time fresh data reset', async () => {
@@ -139,9 +128,9 @@ test('Netlify API performs a guarded one-time fresh data reset', async () => {
   assert.equal((await request(secondHandler, 'POST', '/api/login', {
     username: 'hannah',
     password: 'hannah-reset-pass',
-  })).statusCode, 200)
+  })).statusCode, 401)
   assert.equal((await request(secondHandler, 'POST', '/api/login', {
     username: 'hannah',
     password: 'another-initial-pass',
-  })).statusCode, 401)
+  })).statusCode, 200)
 })

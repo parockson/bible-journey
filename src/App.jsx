@@ -50,32 +50,6 @@ function Login({ onLogin }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [mode, setMode] = useState('login')
-  const [requestId, setRequestId] = useState('')
-  const [resetStatus, setResetStatus] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-
-  useEffect(() => {
-    if (mode !== 'waiting' || !requestId) return undefined
-    let cancelled = false
-    const checkStatus = async () => {
-      try {
-        const data = await api(`/api/password-reset/status/${encodeURIComponent(requestId)}`)
-        if (cancelled) return
-        if (data.status === 'approved') setMode('reset')
-        else if (['denied', 'expired', 'completed'].includes(data.status)) setResetStatus(data.status)
-      } catch (err) {
-        if (!cancelled) setError(err.message)
-      }
-    }
-    checkStatus()
-    const timer = setInterval(checkStatus, 3000)
-    return () => {
-      cancelled = true
-      clearInterval(timer)
-    }
-  }, [mode, requestId])
 
   async function submit(e) {
     e.preventDefault()
@@ -91,43 +65,6 @@ function Login({ onLogin }) {
     }
   }
 
-  async function requestPasswordReset() {
-    setBusy(true)
-    setError('')
-    try {
-      const data = await api('/api/password-reset/request', null, { username: who })
-      setRequestId(data.requestId)
-      setResetStatus('')
-      setMode(data.status === 'approved' ? 'reset' : 'waiting')
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function completePasswordReset(e) {
-    e.preventDefault()
-    if (newPassword !== confirmPassword) {
-      setError('The passwords do not match.')
-      return
-    }
-    setBusy(true)
-    setError('')
-    try {
-      await api('/api/password-reset/complete', null, { requestId, password: newPassword })
-      setPassword('')
-      setNewPassword('')
-      setConfirmPassword('')
-      setMode('login')
-      setResetStatus('completed')
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
   return (
     <main className="login">
       <div className="login-card">
@@ -135,139 +72,35 @@ function Login({ onLogin }) {
         <h1>Our Bible Journey</h1>
         <p className="sub">730 days. Two hearts. One Word.</p>
 
-        {mode === 'login' && (
-          <>
-            <div className="who">
-              {['hannah', 'prince'].map((u) => (
-                <button
-                  key={u}
-                  type="button"
-                  className={`who-btn u-${u} ${who === u ? 'selected' : ''}`}
-                  onClick={() => { setWho(u); setError(''); setResetStatus('') }}
-                >
-                  <span className="avatar">{u[0].toUpperCase()}</span>
-                  {u[0].toUpperCase() + u.slice(1)}
-                </button>
-              ))}
-            </div>
-            {resetStatus === 'completed' && <p className="success">Password reset. Sign in with your new password.</p>}
-            {who && (
-              <form onSubmit={submit}>
-                <input
-                  type="password"
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoFocus
-                />
-                {error && <p className="error">{error}</p>}
-                <button className="primary" disabled={busy || !password}>
-                  {busy ? 'Signing in…' : 'Enter'}
-                </button>
-                <button className="text-button" type="button" disabled={busy} onClick={requestPasswordReset}>
-                  Forgot password?
-                </button>
-              </form>
-            )}
-          </>
-        )}
-        {mode === 'waiting' && (
-          <div className="password-flow">
-            <p>A password reset request has been sent to {who === 'hannah' ? 'Prince' : 'Hannah'}. It expires in 24 hours.</p>
-            {resetStatus && <p className="error">The request was {resetStatus}. Your current password is unchanged.</p>}
+        <div className="who">
+          {['hannah', 'prince'].map((u) => (
+            <button
+              key={u}
+              type="button"
+              className={`who-btn u-${u} ${who === u ? 'selected' : ''}`}
+              onClick={() => { setWho(u); setError('') }}
+            >
+              <span className="avatar">{u[0].toUpperCase()}</span>
+              {u[0].toUpperCase() + u.slice(1)}
+            </button>
+          ))}
+        </div>
+        {who && (
+          <form onSubmit={submit}>
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoFocus
+            />
             {error && <p className="error">{error}</p>}
-            <button className="ghost" onClick={() => { setMode('login'); setResetStatus(''); setError('') }}>Back to sign in</button>
-          </div>
-        )}
-        {mode === 'reset' && (
-          <form onSubmit={completePasswordReset}>
-            <p>Your reset request was approved. Choose a new password within 24 hours.</p>
-            <input type="password" placeholder="New password (at least 8 characters)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoFocus />
-            <input type="password" placeholder="Confirm new password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
-            {error && <p className="error">{error}</p>}
-            <button className="primary" disabled={busy || newPassword.length < 8 || !confirmPassword}>
-              {busy ? 'Saving…' : 'Set new password'}
+            <button className="primary" disabled={busy || !password}>
+              {busy ? 'Signing in…' : 'Enter'}
             </button>
           </form>
         )}
-        {mode === 'login' && error && !who && <p className="error">{error}</p>}
         <p className="verse">“Your word is a lamp to my feet and a light to my path.” — Psalm 119:105</p>
-      </div>
-    </main>
-  )
-}
-
-function PasswordChange({ token, onComplete }) {
-  const [password, setPassword] = useState('')
-  const [confirmation, setConfirmation] = useState('')
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  async function submit(e) {
-    e.preventDefault()
-    if (password !== confirmation) {
-      setError('The passwords do not match.')
-      return
-    }
-    setBusy(true)
-    setError('')
-    try {
-      await api('/api/password/change', token, { password })
-      onComplete()
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <main className="login">
-      <div className="login-card">
-        <div className="cross" aria-hidden="true">✝</div>
-        <h1>Choose a new password</h1>
-        <p className="sub">For your account’s security, set a new password before continuing your journey.</p>
-        <form onSubmit={submit}>
-          <input type="password" placeholder="New password (at least 8 characters)" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus />
-          <input type="password" placeholder="Confirm new password" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} />
-          {error && <p className="error">{error}</p>}
-          <button className="primary" disabled={busy || password.length < 8 || !confirmation}>
-            {busy ? 'Saving…' : 'Save new password'}
-          </button>
-        </form>
-      </div>
-    </main>
-  )
-}
-
-function ResetApproval({ token, request, onDecision }) {
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  async function decide(approve) {
-    setBusy(true)
-    setError('')
-    try {
-      await api('/api/password-reset/decision', token, { id: request.id, approve })
-      onDecision()
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <main className="login">
-      <div className="login-card">
-        <div className="cross" aria-hidden="true">✝</div>
-        <h1>Password reset request</h1>
-        <p className="sub">{request.requesterName} forgot their password and is asking you to approve a reset. If approved, they can choose a new password on their device within 24 hours. You will not see their new password.</p>
-        {error && <p className="error">{error}</p>}
-        <div className="approval-actions">
-          <button className="primary" disabled={busy} onClick={() => decide(true)}>Approve reset</button>
-          <button className="ghost" disabled={busy} onClick={() => decide(false)}>Decline</button>
-        </div>
       </div>
     </main>
   )
@@ -437,15 +270,11 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState('')
   const [showCovenant, setShowCovenant] = useState(false)
-  const [mustChangePassword, setMustChangePassword] = useState(false)
-  const [pendingResetApproval, setPendingResetApproval] = useState(null)
 
   const logout = useCallback(() => {
     localStorage.removeItem('bj-token')
     setToken(null)
     setState(null)
-    setMustChangePassword(false)
-    setPendingResetApproval(null)
   }, [])
 
   const load = useCallback(async () => {
@@ -453,8 +282,6 @@ export default function App() {
     try {
       const data = await api('/api/state', token)
       setState(data)
-      if (data.mustChangePassword) setMustChangePassword(true)
-      if (data.pendingResetApproval) setPendingResetApproval(data.pendingResetApproval)
     } catch (err) {
       if (err.status === 401) logout()
     }
@@ -502,27 +329,10 @@ export default function App() {
         onLogin={(data) => {
           localStorage.setItem('bj-token', data.token)
           setToken(data.token)
-          setMustChangePassword(data.mustChangePassword)
-          setPendingResetApproval(data.pendingResetApproval)
-          if (!data.mustChangePassword && !data.pendingResetApproval) setShowCovenant(true)
+          setShowCovenant(true)
         }}
       />
     )
-  }
-  if (pendingResetApproval) {
-    return (
-      <ResetApproval
-        token={token}
-        request={pendingResetApproval}
-        onDecision={() => {
-          setPendingResetApproval(null)
-          if (!mustChangePassword) setShowCovenant(true)
-        }}
-      />
-    )
-  }
-  if (mustChangePassword) {
-    return <PasswordChange token={token} onComplete={() => { setMustChangePassword(false); setShowCovenant(true) }} />
   }
   if (!state || !me) {
     return (

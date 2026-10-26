@@ -72,11 +72,6 @@ input[type='password']:focus { outline: none; border-color: var(--gold); }
 .primary {
   padding: 13px; border-radius: 12px; background: var(--ink); color: #fff; font-weight: 600;
 }
-.text-button { background: transparent; color: var(--prince); padding: 4px; font-size: 0.9rem; }
-.password-flow { display: grid; gap: 14px; text-align: left; line-height: 1.5; }
-.password-flow p { margin: 0; }
-.success { color: var(--good); font-size: 0.9rem; }
-.approval-actions { display: grid; gap: 10px; }
 .error { color: #b3261e; margin: 0; font-size: 0.9rem; }
 .verse { margin: 26px 0 0; font-family: 'Fraunces', serif; font-style: italic; color: var(--muted); font-size: 0.9rem; }
 

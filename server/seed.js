@@ -27,7 +27,6 @@ if (!fs.existsSync(usersFile)) {
   ])
 }
 write('progress.json', { hannah: {}, prince: {} })
-write('password-resets.json', [])
 write('config.json', {
   startDate: '2026-10-26',
   prestartProgressResetDate: '',

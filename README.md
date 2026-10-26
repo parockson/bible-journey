@@ -20,51 +20,39 @@ Open it from your phones on the same Wi-Fi with `http://<your-computer-ip>:3001`
 
 ## Logins
 
-For a fresh local install, set private initial passwords before starting the server for the first time:
+Set the fixed account passwords as environment variables before starting a fresh local server:
 
 ```powershell
-$env:HANNAH_INITIAL_PASSWORD = "choose-a-private-password"
-$env:PRINCE_INITIAL_PASSWORD = "choose-another-private-password"
+$env:HANNAH_INITIAL_PASSWORD = "<Hannah's configured password>"
+$env:PRINCE_INITIAL_PASSWORD = "<Prince's configured password>"
 npm run dev
 ```
 
-The first run creates local accounts in `server/data/users.json` with hashed passwords. That data directory is excluded from Git. For an already initialized local install, change a password with:
-
-```bash
-npm run set-password -- hannah MyNewPassword
-npm run set-password -- prince TheirNewPassword
-```
-
-Passwords are stored hashed (scrypt), not as plain text.
+The first run creates local accounts in `server/data/users.json` with scrypt-hashed passwords. Password changes and recovery are disabled in the app. To update the Netlify accounts to the configured passwords, update the environment variables and deploy; existing progress and settings are preserved.
 
 Do not put actual passwords or account files in Git. The Netlify API creates its accounts from private environment variables the first time it runs; local account files are not deployed.
 
 ## Deploying on Netlify
 
-`netlify.toml` builds the frontend and routes `/api/*` to the Netlify Function. The function stores accounts, progress, settings, and password-reset requests in the persistent `bible-journey` Netlify Blobs store.
+`netlify.toml` builds the frontend and routes `/api/*` to the Netlify Function. The function stores accounts, progress, and settings in the persistent `bible-journey` Netlify Blobs store.
 
 In your Netlify site, add these environment variables under **Project configuration → Environment variables**. Keep them private; do not put their values in source files or commit them.
 
 | Variable | Value |
 |----------|-------|
 | `AUTH_SECRET` | A random secret of at least 32 characters. Generate one with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"` |
-| `HANNAH_INITIAL_PASSWORD` | A private initial password for Hannah (at least 8 characters) |
-| `PRINCE_INITIAL_PASSWORD` | A private initial password for Prince (at least 8 characters) |
+| `HANNAH_INITIAL_PASSWORD` | Hannah's fixed password (at least 8 characters) |
+| `PRINCE_INITIAL_PASSWORD` | Prince's fixed password (at least 8 characters) |
 
-After adding the variables, trigger a new Netlify deploy. The accounts are initialized on the first API request. The initial passwords are only used if the account does not already exist in Blobs; subsequent password changes are stored there and survive new deploys.
+After adding or updating the variables, trigger a new Netlify deploy. On the next API request, accounts are created or their stored password hashes are synchronized to these values. Existing progress and settings are preserved.
 
 Local JSON data in `server/data/` is not automatically copied to Netlify. Keep that directory out of Git.
 
 ### One-time Netlify data reset
 
-To erase the Netlify Blobs data for a fresh start, add `RESET_BIBLE_JOURNEY_DATA=true` to the production environment variables and deploy. The next API request deletes the site's stored accounts, progress, settings, and password-reset requests, then initializes new accounts from the existing initial-password variables. Remove `RESET_BIBLE_JOURNEY_DATA` and deploy again after the reset. The reset is guarded by a persistent one-time marker, so leaving the variable set will not repeat the reset.
+To erase all Netlify Blobs data for a fresh start, add `RESET_BIBLE_JOURNEY_DATA=true` to the production environment variables and deploy. The next API request deletes the site's stored accounts, progress, and settings, then initializes accounts from the configured passwords. Remove `RESET_BIBLE_JOURNEY_DATA` and deploy again after the reset. The reset is guarded by a persistent one-time marker, so leaving the variable set will not repeat it.
 
-## Password changes and recovery
-
-- On or after October 26, 2026, each person must sign in with their current password and choose a new password before continuing. Passwords must be at least 8 characters.
-- Use **Forgot password?** on the login screen to request a reset. The other person must sign in and approve or decline the request within 24 hours.
-- If approved, the requester has 24 hours to set a new password on their own device. The approving partner never sees the new password.
-- If declined or not approved before expiry, the existing password remains unchanged.
+These are shared, fixed passwords and cannot be changed or recovered through the app. Use distinct passwords that are not reused elsewhere, and share them only with the intended account holders.
 
 ## The rules the app enforces
 
@@ -81,7 +69,6 @@ To erase the Netlify Blobs data for a fresh start, add `RESET_BIBLE_JOURNEY_DATA
 | `server/data/users.json` | local-development logins (hashed passwords; excluded from Git) |
 | `server/data/progress.json` | local-development reading progress (excluded from Git) |
 | `server/data/config.json` | local-development settings (excluded from Git) |
-| `server/data/password-resets.json` | local-development password reset requests (excluded from Git) |
 | `src/plan.json` | the full 730-day plan, taken from your PDF |
 
 **Official start date:** Day 1 begins October 26, 2026. Check-offs are disabled before then, and any reading progress present before the start is cleared once per day. Starting October 26, check-offs are permanent and cannot be undone. To change the date, edit `startDate` (YYYY-MM-DD) in `server/data/config.json`.
