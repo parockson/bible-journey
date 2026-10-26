@@ -3,6 +3,7 @@ import { getStore } from '@netlify/blobs'
 import { hashPassword, makeSignedToken, readSignedToken } from '../../server/auth-core.js'
 
 const STORE_NAME = 'bible-journey'
+const RESET_MARKER = 'admin:one-time-data-reset:v1'
 const START_DATE = '2026-10-26'
 const ACCOUNTS = {
   hannah: 'Hannah',
@@ -61,7 +62,35 @@ export function createApiHandler(store, env = process.env) {
     await store.setJSON(key, value, options)
   }
 
+  async function resetDataOnce() {
+    if (env.RESET_BIBLE_JOURNEY_DATA !== 'true') return
+
+    const marker = await readJson(RESET_MARKER)
+    if (marker?.status === 'complete') return
+    if (marker) throw new ApiError(503, 'The one-time data reset is already in progress. Retry shortly.')
+
+    const claim = await store.setJSON(RESET_MARKER, { status: 'in-progress' }, { onlyIfNew: true })
+    if (!claim.modified) {
+      const current = await readJson(RESET_MARKER)
+      if (current?.status === 'complete') return
+      throw new ApiError(503, 'The one-time data reset is already in progress. Retry shortly.')
+    }
+
+    try {
+      const { blobs } = await store.list()
+      for (const { key } of blobs) {
+        if (key !== RESET_MARKER) await store.delete(key)
+      }
+      await writeJson(RESET_MARKER, { status: 'complete' })
+    } catch (error) {
+      await store.delete(RESET_MARKER)
+      throw error
+    }
+  }
+
   async function ensureData() {
+    await resetDataOnce()
+
     for (const [username, displayName] of Object.entries(ACCOUNTS)) {
       if (await readJson(`user:${username}`)) continue
 

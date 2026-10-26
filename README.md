@@ -55,6 +55,10 @@ After adding the variables, trigger a new Netlify deploy. The accounts are initi
 
 Local JSON data in `server/data/` is not automatically copied to Netlify. Keep that directory out of Git.
 
+### One-time Netlify data reset
+
+To erase the Netlify Blobs data for a fresh start, add `RESET_BIBLE_JOURNEY_DATA=true` to the production environment variables and deploy. The next API request deletes the site's stored accounts, progress, settings, and password-reset requests, then initializes new accounts from the existing initial-password variables. Remove `RESET_BIBLE_JOURNEY_DATA` and deploy again after the reset. The reset is guarded by a persistent one-time marker, so leaving the variable set will not repeat the reset.
+
 ## Password changes and recovery
 
 - On or after October 26, 2026, each person must sign in with their current password and choose a new password before continuing. Passwords must be at least 8 characters.
