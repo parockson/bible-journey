@@ -1,5 +1,5 @@
 import crypto from 'node:crypto'
-import { getStore } from '@netlify/blobs'
+import { connectLambda, getStore } from '@netlify/blobs'
 import { hashPassword, makeSignedToken, readSignedToken } from '../../server/auth-core.js'
 
 const STORE_NAME = 'bible-journey'
@@ -227,5 +227,6 @@ export function createApiHandler(store, env = process.env) {
 }
 
 export async function handler(event) {
+  connectLambda(event)
   return createApiHandler(getStore(STORE_NAME))(event)
 }
